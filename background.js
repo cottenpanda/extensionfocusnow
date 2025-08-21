@@ -2,6 +2,8 @@
 
 // Storage keys
 const PARKED_TABS_KEY = 'parkedTabs';
+const STORAGE_VERSION_KEY = 'storageVersion';
+const CURRENT_STORAGE_VERSION = 1;
 
 // Tab storage structure
 class ParkedTab {
@@ -12,19 +14,92 @@ class ParkedTab {
     this.title = tab.title;
     this.favIconUrl = tab.favIconUrl;
     this.parkedAt = new Date().toISOString();
+    this.deviceId = getDeviceId();
     console.log('DEBUG: Created ParkedTab with ID:', this.id, 'title:', this.title);
   }
 }
 
-// Get all parked tabs from storage
-async function getParkedTabs() {
-  const result = await chrome.storage.local.get([PARKED_TABS_KEY]);
-  return result[PARKED_TABS_KEY] || [];
+// Generate or get device ID for sync conflict resolution
+function getDeviceId() {
+  if (!chrome.storage.local.deviceId) {
+    chrome.storage.local.deviceId = `device-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+  return chrome.storage.local.deviceId;
 }
 
-// Save parked tabs to storage
+// Enhanced storage with sync support
+async function getParkedTabs() {
+  try {
+    // Try sync storage first for cross-device functionality
+    const syncResult = await chrome.storage.sync.get([PARKED_TABS_KEY, STORAGE_VERSION_KEY]);
+    
+    if (syncResult[PARKED_TABS_KEY] && syncResult[STORAGE_VERSION_KEY] === CURRENT_STORAGE_VERSION) {
+      console.log('DEBUG: Loaded tabs from sync storage:', syncResult[PARKED_TABS_KEY].length);
+      return syncResult[PARKED_TABS_KEY];
+    }
+    
+    // Fallback to local storage
+    const localResult = await chrome.storage.local.get([PARKED_TABS_KEY]);
+    console.log('DEBUG: Loaded tabs from local storage:', (localResult[PARKED_TABS_KEY] || []).length);
+    
+    // If we have local data but no sync data, migrate to sync
+    if (localResult[PARKED_TABS_KEY] && localResult[PARKED_TABS_KEY].length > 0) {
+      await migrateToSyncStorage(localResult[PARKED_TABS_KEY]);
+      return localResult[PARKED_TABS_KEY];
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error getting parked tabs, falling back to local storage:', error);
+    const localResult = await chrome.storage.local.get([PARKED_TABS_KEY]);
+    return localResult[PARKED_TABS_KEY] || [];
+  }
+}
+
+// Save parked tabs with sync support and optimized performance
 async function saveParkedTabs(parkedTabs) {
-  await chrome.storage.local.set({ [PARKED_TABS_KEY]: parkedTabs });
+  try {
+    // Limit sync storage to prevent quota issues (Chrome sync has ~100KB limit)
+    const maxSyncTabs = 30; // More conservative for better performance
+    const tabsToSync = parkedTabs.slice(0, maxSyncTabs);
+    
+    // Optimize data for sync storage (remove large fields)
+    const optimizedTabsForSync = tabsToSync.map(tab => ({
+      id: tab.id,
+      url: tab.url,
+      title: tab.title.substring(0, 100), // Limit title length
+      favIconUrl: tab.favIconUrl && tab.favIconUrl.startsWith('data:') ? null : tab.favIconUrl, // Remove data URLs
+      parkedAt: tab.parkedAt,
+      deviceId: tab.deviceId
+    }));
+    
+    // Save to both storages in parallel for better performance
+    await Promise.all([
+      // Sync storage with optimized data
+      chrome.storage.sync.set({ 
+        [PARKED_TABS_KEY]: optimizedTabsForSync,
+        [STORAGE_VERSION_KEY]: CURRENT_STORAGE_VERSION
+      }),
+      // Local storage with full data
+      chrome.storage.local.set({ [PARKED_TABS_KEY]: parkedTabs })
+    ]);
+    
+    console.log('DEBUG: Saved', optimizedTabsForSync.length, 'tabs to sync,', parkedTabs.length, 'tabs to local');
+  } catch (error) {
+    console.error('Error saving to sync storage, using local only:', error);
+    // Fallback to local storage
+    await chrome.storage.local.set({ [PARKED_TABS_KEY]: parkedTabs });
+  }
+}
+
+// Migrate existing local data to sync storage
+async function migrateToSyncStorage(localTabs) {
+  try {
+    console.log('DEBUG: Migrating', localTabs.length, 'tabs to sync storage');
+    await saveParkedTabs(localTabs);
+  } catch (error) {
+    console.error('Error migrating to sync storage:', error);
+  }
 }
 
 // Add a tab to parked tabs
@@ -64,6 +139,38 @@ async function parkMultipleTabs(tabs) {
   return newParkedTabs;
 }
 
+// Async parking for better performance - doesn't block UI
+async function parkMultipleTabsAsync(tabs) {
+  try {
+    console.log('DEBUG: parkMultipleTabsAsync started with', tabs.length, 'tabs');
+    
+    // Get existing tabs and create new ones in parallel
+    const [existingParkedTabs] = await Promise.all([
+      getParkedTabs()
+    ]);
+    
+    const newParkedTabs = tabs.map(tab => new ParkedTab(tab));
+    const allParkedTabs = [...newParkedTabs, ...existingParkedTabs];
+    
+    // Save to storage asynchronously
+    await saveParkedTabs(allParkedTabs);
+    console.log('DEBUG: Background parking completed for', tabs.length, 'tabs');
+    
+  } catch (error) {
+    console.error('Error in async parking:', error);
+    // Fallback: try saving to local storage only
+    try {
+      const existingParkedTabs = await chrome.storage.local.get([PARKED_TABS_KEY]);
+      const newParkedTabs = tabs.map(tab => new ParkedTab(tab));
+      const allParkedTabs = [...newParkedTabs, ...(existingParkedTabs[PARKED_TABS_KEY] || [])];
+      await chrome.storage.local.set({ [PARKED_TABS_KEY]: allParkedTabs });
+      console.log('DEBUG: Fallback parking completed');
+    } catch (fallbackError) {
+      console.error('ERROR: Both sync and local storage failed:', fallbackError);
+    }
+  }
+}
+
 // Remove a parked tab by ID
 async function unparkTab(tabId) {
   const parkedTabs = await getParkedTabs();
@@ -86,7 +193,11 @@ async function focusNow() {
       return;
     }
 
-    // Start animation immediately while processing tabs
+    // OPTIMIZATION: Close tabs immediately for instant user feedback
+    const tabIds = tabsToPark.map(tab => tab.id);
+    chrome.tabs.remove(tabIds).catch(error => console.error('Error closing tabs:', error));
+
+    // Start animation immediately (runs in parallel with storage)
     const animationPromise = chrome.scripting.executeScript({
       target: { tabId: currentTab.id },
       func: triggerGlobalFlyAnimation,
@@ -97,14 +208,10 @@ async function focusNow() {
       }))]
     }).catch(error => console.log('Animation error:', error));
 
-    // Park all tabs at once to avoid race conditions
-    await parkMultipleTabs(tabsToPark);
+    // Park tabs in background (don't block user experience)
+    parkMultipleTabsAsync(tabsToPark);
 
-    // Close tabs immediately after parking (animation runs in parallel)
-    const tabIds = tabsToPark.map(tab => tab.id);
-    chrome.tabs.remove(tabIds).catch(error => console.error('Error closing tabs:', error));
-
-    console.log(`Parked ${tabsToPark.length} tabs`);
+    console.log(`Parking ${tabsToPark.length} tabs in background`);
 
   } catch (error) {
     console.error('Error in focusNow:', error);
