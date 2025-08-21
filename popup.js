@@ -87,8 +87,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   function displayParkedTabs(tabs) {
     const currentCount = tabs.length;
     
-    // Trigger count animation if count increased
-    if (currentCount > previousTabCount && previousTabCount > 0) {
+    // Trigger count animation for any significant change (including to/from 0)
+    if (currentCount !== previousTabCount && previousTabCount >= 0) {
       animateCountChange();
     }
     
@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const removeButton = document.createElement('button');
     removeButton.className = 'remove-tab-button';
     removeButton.innerHTML = 'close';
-    removeButton.title = 'Remove tab';
+    removeButton.title = 'Close the tab';
     
     removeButton.addEventListener('click', (e) => {
       e.stopPropagation();
