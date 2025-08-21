@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Focus Now</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=close" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      overflow: hidden;
+      background: #1f1f1f;
+      border: none;
+      outline: none;
+      width: 360px;
+      height: 600px;
+    }
+
+    .main-container {
+      width: 100%;
+      height: 100%;
+      background: #1f1f1f;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding: 0;
+      overflow: hidden;
+      box-sizing: border-box;
+      justify-content: space-between;
+      align-items: flex-start;
+      max-width: 100%;
+    }
+
+    .header-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: flex-start;
+      flex-shrink: 0;
+      width: 100%;
+      padding: 20px 20px 0 20px;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+    }
+
+    .title {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: bold;
+      font-size: 18px;
+      line-height: 1.2;
+      color: #ffffff;
+      margin: 0;
+    }
+
+    .subtitle {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: normal;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #ffffff;
+      margin: 0;
+      width: 100%;
+    }
+
+    .focus-button {
+      background: #ffffff;
+      color: #080808;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 24px;
+      font-family: 'Open Sans', sans-serif;
+      font-weight: normal;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .focus-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      background: #f8f8f8;
+    }
+
+    .focus-button:active {
+      transform: translateY(0);
+    }
+
+    .focus-button.working {
+      opacity: 0.8;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .focus-button.disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .divider {
+      background: #444444;
+      height: 1px;
+      width: 100%;
+      flex-shrink: 0;
+    }
+
+    .parked-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      overflow: hidden;
+      padding: 0 20px;
+    }
+
+    .parked-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .parked-title {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: bold;
+      font-size: 16px;
+      line-height: 1;
+      color: #ffffff;
+      margin: 0;
+    }
+
+    .parked-count {
+      background: #ffffff;
+      color: #080808;
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Open Sans', sans-serif;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      flex: 1;
+      justify-content: center;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .empty-title {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: normal;
+      font-size: 14px;
+      line-height: 1.2;
+      color: #ffffff;
+      text-align: center;
+      margin: 0;
+    }
+
+    .empty-icon {
+      width: 80px;
+      height: 80px;
+      background-image: url('./icons/Focus now ionc.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    .parked-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      width: 100%;
+      height: 485px;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .parked-tab {
+      display: flex;
+      flex-direction: row;
+      gap: 16px;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      padding: 8px;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    .parked-tab:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-favicon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      flex-shrink: 0;
+      object-fit: cover;
+      background: #d9d9d9;
+    }
+
+    .tab-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      overflow: hidden;
+      min-width: 0;
+      justify-content: center;
+      max-width: calc(100% - 80px);
+      padding-right: 8px;
+    }
+
+    .tab-title {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: normal;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #ffffff;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tab-meta {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .tab-url {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: normal;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #aaaaaa;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      min-width: 0;
+      margin-right: 4px;
+    }
+
+    
+
+    .tab-time {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: normal;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #aaaaaa;
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .remove-tab-button {
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #aaaaaa;
+      font-family: 'Material Symbols Outlined';
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+
+    .remove-tab-button:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      transform: scale(1.1);
+    }
+
+    .parked-tab {
+      position: relative;
+    }
+
+    .parked-tab:hover .remove-tab-button {
+      opacity: 1;
+    }
+
+    .action-buttons {
+      display: none;
+      flex-direction: row;
+      gap: 20px;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0 0 20px 0;
+      border-bottom-left-radius: 16px;
+      border-bottom-right-radius: 16px;
+    }
+
+    .restore-all-button {
+      background: #179e5a;
+      color: #ffffff;
+      border: none;
+      padding: 8px 28px;
+      border-radius: 20px;
+      font-family: 'Open Sans', sans-serif;
+      font-weight: normal;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .restore-all-button:hover {
+      background: #148a50;
+      transform: translateY(-1px);
+    }
+
+    .close-all-button {
+      background: #cb4949;
+      color: #ffffff;
+      border: none;
+      padding: 8px 28px;
+      border-radius: 20px;
+      font-family: 'Open Sans', sans-serif;
+      font-weight: normal;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .close-all-button:hover {
+      background: #b84141;
+      transform: translateY(-1px);
+    }
+
+
+    /* Custom scrollbar */
+    .parked-tabs::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .parked-tabs::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    .parked-tabs::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+    }
+
+    .parked-tabs::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    /* Animations */
+    .parked-tab {
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Hidden states */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <div class="header-section">
+      <h1 class="title">Focus now</h1>
+      <p class="subtitle">One click hides all other tabs, so you can focus on this one—and bring them back anytime.</p>
+      <button id="focusButton" class="focus-button">
+        Focus now
+      </button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="parked-section">
+      <div class="parked-header">
+        <span class="parked-title">Parked tabs</span>
+        <div id="parkedCount" class="parked-count">0</div>
+      </div>
+
+      <div id="parkedTabsList" class="parked-tabs"></div>
+
+      <div id="emptyState" class="empty-state">
+        <div class="empty-title">No parked tabs yet</div>
+        <div class="empty-icon"></div>
+      </div>
+
+      <div id="actionButtons" class="action-buttons">
+        <button id="restoreAllButton" class="restore-all-button">
+          Restore all tabs
+        </button>
+        <button id="closeAllButton" class="close-all-button">
+          Close all tabs
+        </button>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
